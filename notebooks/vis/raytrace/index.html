@@ -1,0 +1,203 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Black Hole Iterative Skymap - WebGL</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
+		<script type="text/javascript" src="js/purl.js"></script>
+		<script type="text/javascript" src="js/util.js"></script>
+		<script type="text/javascript" src="js/gl-matrix.2.2.0.min.js"></script>
+		<script type="text/javascript" src="js/gl-util.js"></script>
+		<script type="text/javascript" src="js/gl-util-gradient.js"></script>
+		<script type="text/javascript" src="js/gl-util-unitquad.js"></script>
+		<script type="text/javascript" src="js/gl-util-kernel.js"></script>
+		<script type="text/javascript" src="js/mouse3d.js"></script>
+		<script type="text/javascript" src="js/MathJax.js"></script>
+		<script type="text/javascript" src="js/renderer.testcube.js"></script>
+		<script type="text/javascript" src="js/renderer.sw.js"></script>
+		<script type="text/javascript" src="js/renderer.fbo.js"></script>
+		<script type="text/javascript" src="js/main.js"></script>
+
+<script>
+MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<!-- script type='text/javascript'>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-17312646-1']);
+_gaq.push(['_trackPageview']);
+(function() {
+	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script -->
+
+	</head>
+	<body style="margin:0px; overflow:hidden; background-color:black; color:white">
+		<div id="menu" style="position:absolute">
+			<img id="panelButton" src="images/menu.png" style="padding:5px">
+			<button id="infoButton" style="background-color:black; color:white; width:24px; height:24px; border:1px solid white; cursor:pointer; display:table-cell; align:center; vertical-align:top; margin:5px">?</button><br>
+		</div>
+		<div id="panel" style="overflow:scroll; z-index:1; position:absolute; top:32px; display:none">
+			Iteration d/dLambda: <input id="deltaLambda"><br>
+			<select id="objectTypes"></select><br>
+			Object Distance (m): <input id="objectDist"><br>
+			
+			<!-- TODO only show this for Schwarzschild/Kerr black holes -->
+			Black Hole Mass (kg): <input id="blackHoleMass"><br>
+			<!-- TODO only the two Kerr black hole options -->
+			Black Hole Charge (kg): <input id="blackHoleCharge"><br>
+			Black Hole Angular Velocity (kg): <input id="blackHoleAngularVelocity"><br>
+			<div id="Schwarzschild_Black_Hole_params">
+			</div>
+			<div id="Kerr_Black_Hole_params">
+			</div>
+			<div id="Alcubierre_Warp_Drive_Bubble_params">
+				Warp Bubble Thickness: <input id="warpBubbleThickness"><br>
+				Warp Bubble Velocity (c): <input id="warpBubbleVelocity"><br>
+				Warp Bubble Radius: <input id="warpBubbleRadius"><br>
+			</div>
+			<hr>
+			
+			<input type="radio" name="mouseMethod" value="rotateCamera" checked="1/"> rotate background<br>
+			<input type="radio" name="mouseMethod" value="rotateObject"> rotate view<br>
+			<hr>
+
+			<input type="radio" name="drawMethod" value="background" checked="1/"> show background<br>
+			<input type="radio" name="drawMethod" value="pos_xyz"> show position<br>
+			<input type="radio" name="drawMethod" value="pos_t"> show time ratio<br>
+			<input type="radio" name="drawMethod" value="vel_xyz"> show velocity<br>
+			<input type="radio" name="drawMethod" value="vel_t"> show time dilation<br>
+			<hr>
+
+			<input type="checkbox" id="runSimulation" name="runSimulation" checked="1/"> simulate<br>
+
+			<button id="reset">reset field</button><br>
+			<button id="reset_view">reset view</button><br>
+		</div>
+			
+		<div id="info" style="display:none; overflow:scroll; top:32px; z-index:1; position:absolute; background-color:rgba(255,255,255,.85); color:black; padding:10px">
+			<h3>Photons</h3>
+			Light travels in a straight line.  Let's represent the position of a particle of light as $x^\mu$, for $\mu$ running over indexes 0, 1, 2, 3.
+			$x^0 = t$ will represent the time of the particle as recorded from a stationary observer. $x^i$, for i running 1 through 3, will represent the coordinate in 3D space of the particle.
+			$x^1$ will represent the x coordinate, $x^2 = y$, and $x^3 = z$.<br>
+			<br>
+			Let $\tau$ represent the particle's local time.
+			The change in the light particle's position (in space and time) relative to the observer with respect to the change in the particle's local time can be represented as ${d \over {d\tau}} x^\mu$, or ${\dot x}^\mu$ for short.
+			This is the velocity in the observer's rest frame. 
+			This appearance of velocity is only present to the observer, of course.
+			To the particle of light in its own rest frame, it is existing in all locations from its origin to its destination simultaneously.
+			For more on that check out the page on <a href="/time-dilation">time dilation</a>.<br>
+			<br>
+			<h3>The Line Element</h3>
+			Turns out the spacetime that light travels through is not flat, but curved.
+			Curved geometry is described in terms of its line element $ds^2 = g_{\mu\nu} dx^\mu dx^\nu $.
+			The symbol $g_{\mu\nu}$ is the metric tensor and describes how the curved surface deforms lines drawn along the surface.
+			This line element description comes from the following:<br>
+			<div class="showWork">
+				$ds^2 = g_{\mu\nu} dx^\mu dx^\nu $<br>
+				$ ds^2 = g_{\mu\nu} {dx^\mu \over d\tau} {dx^\nu \over d\tau} {d\tau}^2 $<br>
+				$ ds = \sqrt{g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu} d\tau $<br>
+				$ \int ds = \int \sqrt{g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu} d\tau $<br>
+			</div>
+			$ s = \int \sqrt{g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu} d\tau $<br>
+			This equation looks awfully familiar to the arclength equation.
+			Turns out if we have a coordinate chart to describe the curved surface that the line lies upon then we can simplify the math even further.
+			Let $ {\vec{r}}(x^\mu) $ be that coordinate chart.
+			Then we can define $g_{\mu \nu} = {{d\vec{r}} \over {dx^\mu}} \cdot {{d\vec{r}} \over {dx^\nu}} $ and get a clearer definition:<br>
+			<div class="showWork">
+				$ s = \int \sqrt{ {d{\vec{r}} \over {dx^\mu}} \cdot {d{\vec{r}} \over {dx^\nu}} {dx^\mu \over d\tau} {dx^\nu \over d\tau}} d\tau $<br>
+				$ s = \int \sqrt{ {d{\vec{r}} \over {dx^\mu}} {dx^\mu \over d\tau} \cdot {d{\vec{r}} \over {dx^\nu}} {dx^\nu \over d\tau}} d\tau $<br>
+				$ s = \int \sqrt{ {d{\vec{r}} \over {d\tau}} \cdot {d{\vec{r}} \over {d\tau}} } d\tau $<br>
+				$ s = \int \sqrt{ ||{d\vec{r} \over d\tau}||^2 } d\tau $<br>
+			</div>
+			$ s = \int ||{d\vec{r} \over d\tau}|| d\tau $<br>
+			And there you have the arclength equation recovered from the line element equation.
+			Notice that a coordinate chart is not always available for every metric, which is one reason why the line element definition is more popular.<br>
+			<br>
+			<h3>The Geodesic Equation</h3>
+			So how does one find the coordinates of path that light travels through a curved spacetime?  Enter the world of geodesics.
+			Geodesics calculate the path that a straight line takes over an arbitrarily curved surface.
+			The geodesic equation is described as
+			$ {\ddot x}^\mu + {\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta = 0 $
+			where $ {\Gamma^\mu}_{\alpha \beta} $ is the Christoffel Symbol of the Second Kind.
+			The Christoffel Symbol of the Second Kind can be defined as $ {\Gamma^\alpha}_{\beta\gamma} = g^{\alpha\mu} \Gamma_{\mu\beta\gamma} $,
+			for $g^{\alpha\mu}$ the inverse of the metric tensor and for $ {\Gamma_{\mu\beta\gamma}} $ the Christoffel Symbol of the First Kind.
+			The Christoffel Symbol of the First Kind is then defined as $ \Gamma_{\alpha\beta\gamma} = {1 \over 2} (g_{\alpha\beta,\gamma} + g_{\alpha\gamma,\beta} - g_{\beta\gamma,\alpha})$
+			for comma derivative shorthand $g_{\alpha\beta,\gamma} = {{d g_{\alpha\beta}} \over {d {x^\gamma}}}$.<br>		
+			<br>
+			One of a few ways to derive the geodesic equation is to extremalize the action of the arclength (squared):
+			Let $ I = \int g_{\mu \nu} {\dot x}^\mu {\dot x}^\nu d\tau $ and then solve for $ {{\delta I} \over {\delta x^\alpha}} = 0$.<br>
+			<div class="showWork">	
+			$ I = \int g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu d\tau $<br>
+			$ \delta I = \delta \int g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu d\tau $ <br>
+			$ \delta I = \int ( \delta g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu + g_{\mu\nu} (\delta {\dot x}^\mu {\dot x}^\nu + {\dot x}^\mu \delta {\dot x}^\nu) ) d\tau $ <br>		<!-- delta int == int delta, the distribute -->
+			Next we use integration by parts and disregard the newly created total integrals: $ \int u dv = uv - \int v du $ for $ uv = 0 $ <br>
+			$ \delta I = \int ( \delta g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu - \delta x^\mu ({\dot g}_{\mu\nu} {\dot x}^\nu + g_{\mu\nu} {\ddot x}^\nu) - \delta x^\nu ({\dot g}_{\mu\nu} {\dot x}^\mu g_{\mu\nu} {\ddot x}^\mu) ) d\tau $<br> 
+			$ \delta I = \int ( \delta g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu - \delta x^\nu ({\dot g}_{\nu\mu} {\dot x}^\mu + g_{\nu\mu} {\ddot x}^\mu) - \delta x^\nu ({\dot g}_{\mu\nu} {\dot x}^\mu + g_{\mu\nu} {\ddot x}^\mu) ) d\tau $<br>	<!-- second term swap u's and v's (they're both summed indexes so you can do this) -->
+			$ \delta I = \int ( \delta g_{\mu\nu} {\dot x}^\mu {\dot x}^\nu - 2 \delta x^\nu ({\dot g}_{\mu\nu} {\dot x}^\mu + g_{\mu\nu} {\ddot x}^\mu) ) d\tau $ <br>
+			$ {{\delta I} \over {\delta x^\sigma}} = \int ( {{\delta g_{\mu\nu}} \over {{\delta x}^\sigma}} {\dot x}^\mu {\dot x}^\nu - 2 \delta^\mu_\sigma ({\dot g}_{\mu\nu} {\dot x}^\nu + g_{\mu\nu} {\ddot x}^\nu ) ) d\tau $<br>
+			$ {{\delta I} \over {\delta x^\sigma}} = \int ( {{\delta g_{\mu\nu}} \over {\delta x^\sigma}} {\dot x}^\mu {\dot x}^\nu - 2 ({\dot g}_{\sigma\nu} {\dot x}^\nu + g_{\sigma\nu} {\ddot x}^\nu) ) d\tau $ <br>
+			$ g^{\alpha\sigma} {{\delta I} \over {\delta x^\sigma}} = \int ( g^{\alpha\sigma} {{\delta g_{\mu\nu}} \over {\delta x^\sigma}} {\dot x}^\mu {\dot x}^\nu - 2(g^{\alpha\sigma} {\dot g}_{\sigma\nu} {\dot x}^\nu + {\ddot x}^\alpha) ) d\tau $ <br>
+			Now solve for $ {{\delta I} \over {\delta x^\sigma}} = 0 $ <br>
+			$ {\ddot x}^\alpha + g^{\alpha\sigma} {\dot g}_{\sigma\beta} {\dot x}^\beta - {1 \over 2} g^{\alpha\sigma} {{\delta g_{\beta\gamma}} \over {\delta x^\sigma}} {\dot x}^\beta {\dot x}^\gamma = 0 $ <br>
+			$ {\ddot x}^\alpha + g^{\alpha\sigma} {\dot g}_{\sigma\beta} {\dot x}^\beta - {1 \over 2} g^{\alpha\sigma} {{\delta g_{\beta\gamma}} \over {\delta x^\sigma}} {\dot x}^\beta {\dot x}^\gamma = 0 $ <br>
+			$ {\ddot x}^\alpha + g^{\alpha\sigma} ({{dg_{\sigma\beta}} \over {dx^\gamma}} {\dot x}^\gamma {\dot x}^\beta - {1 \over 2} g^{\alpha\sigma} {{dg_{\beta\gamma}} \over {dx^\sigma}} {\dot x}^\beta {\dot x}^\gamma) = 0 $ <br>
+			$ {\ddot x}^\alpha + g^{\alpha\sigma} (g_{\sigma\beta,\gamma} - {1 \over 2} g_{\beta\gamma,\sigma}) {\dot x}^\beta {\dot x}^\gamma = 0 $ <br>
+			$ {\ddot x}^\alpha + {1 \over 2} g^{\alpha\sigma} (g_{\beta\sigma,\gamma} + g_{\sigma\beta,\gamma} - g_{\beta\gamma,\sigma}) {\dot x}^\beta {\dot x}^\gamma = 0 $ <br>		<!-- split g_{\sigma\beta,\gamma} and swap b's and c's in one of the two halves -->
+			$ {\ddot x}^\alpha + g^{\alpha\sigma} \Gamma_{\sigma\beta\gamma} {\dot x}^\beta {\dot x}^\gamma = 0 $ <br>
+			$ {\ddot x}^\alpha + {\Gamma^\alpha}_{\beta\gamma} {\dot x}^\beta {\dot x}^\gamma = 0 $ <br>		<!-- geodesic equation. -->
+			</div>
+			<br>
+			The geodesic equation gives us a relation between the first and second derivatives of the coordinates our test particle travelling along the geodesic.
+			The coefficients of the relation stored in $ {\Gamma^\mu}_{\alpha \beta} $ are derived from the metric, its inverse, and its first derivative.
+			The metric itself is based on the particle position $x^\mu$.
+			In the end we get a formula for computing ${\ddot x}^\mu$ based on the $x^\mu$ and ${\dot x}^\mu$.<br>
+			<br>
+			<h3>Tracing Rays</h3>
+			Once we have these relations we can approximate them by simulating the position and velocity of light particles at arbitrary samples on the screen. 
+			The positions and velocities are updated using your favorite numeric integration method with the following equations:
+$ {d \over {d\tau}} \left[ \matrix { x^\mu \\ {\dot x}^\mu } \right]
+= \left[ \matrix{ {\dot x}^\mu \\ {\ddot x}^\mu } \right]
+= \left[ \matrix{ {\dot x}^\mu \\ -{\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta } \right]
+$.
+			<h3>Schwarzschild Geodesic</h3>
+			The Schwarzschild metric describes the curvature of spacetime around a spherical object.
+			The Schwarzschild metric in spherical coordinates is $ ds^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - \frac{2 M}{r} )^{-1} dr^2 + r^2 (d\theta^2 + sin(\theta)^2 d\phi^2) $ for M the mass of the object.<br>
+			In isotropic Cartesian coordinates it is given as $ ds^2 = -\left( \frac{1-\frac{M}{2r}}{1+\frac{M}{2r}} \right)^2 dt^2 + \left( 1 + \frac{M}{2r} \right)^4 (dx^2 + dy^2 + dz^2)$.<br>
+			
+			<h3>Kerr Geodesic</h3>
+			The Kerr metric describes the curvature of spacetime around a spherical rotating object.
+			The metric is given as $ {ds}^2 = -{dt}^2 + {dx}^2 + {dy}^2 + {dz}^2 + {2mr^3 \over {r^4 + a^2 z^2}} (dt + {{rx+ay}\over{a^2+r^2}} dx + {{ry-ax}\over{a^2+r^2}} dy + {z \over r} dz)^2 $
+			for the mass $m$, angular acceleration $a$, and $r$ is defined by $ x^2 + y^2 + z^2 = r^2 + a^2 (1 - {z^2 \over r^2}) $.<br>
+			<h3>Alcubierre Warp Bubble Geodesic</h3>
+			The Alcubierre warp bubble metric describes the curvature of spacetime around a warp bubble.
+			The metric is given as $ {ds}^2 = ({v_s}^2 f(r_s(t))^2 - 1) {dt}^2 - 2 v_s f(r_s) {dx} {dt} + {dx}^2 + {dy}^2 + {dz}^2 $
+			for $ f(r_s) = (tanh(\sigma(r_s + R)) - tanh(\sigma(r_s - R))) / (2 tanh(\sigma R)) $,
+			$r_s = \sqrt{(x - x_s)^2 + y^2 + z^2} $,
+			$x_s$ the warp bubble distance,
+			$v_s$ the warp bubble velocity,
+			R the warp bubble radius,
+			and $ \sigma $ the warp bubble thickness.<br>
+		</div>
+		
+		<div id="webglfail" style="display:none">
+			Sorry, your browser does not support WebGL<br>
+			Try one of these other, better browsers:<br>
+			<a href="http://www.google.com/chrome">Chrome</a><br>
+			<a href="http://www.mozilla.org/firefox">Firefox</a><br>
+			<a href="http://www.apple.com/safari">Safari</a><br>
+			<b>Opera Users:</b><br>
+			Enter "opera:config" in the address bar.<br>
+			In the "User Prefs" section set both "Enable Hardware Acceleration" and "Enable WebGL" to "1" and then click "Save".<br>
+			It is still buggy.<br>
+			<b>IE Users:</b><br>
+			Sorry guys, IE doesn't plan to support WebGL.<br>
+			Consider using a more <a href="http://www.w3schools.com/browsers/browsers_stats.asp">standard compliant</a> browser.<br>
+		</div>
+	</body>
+</html>
