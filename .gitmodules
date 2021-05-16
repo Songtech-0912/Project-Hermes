@@ -1,0 +1,3 @@
+[submodule "notebooks/latspy"]
+	path = notebooks/latspy
+	url = https://github.com/Songtech-0912/Latspy
