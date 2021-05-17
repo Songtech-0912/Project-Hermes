@@ -1,13 +1,11 @@
+MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
 var glMaxCubeMapTextureSize;
 var canvas;
 var gl;
 var glutil;
 
-var objectTypes = [
-	'Schwarzschild Black Hole',	
-	'Kerr Black Hole degeneracy',	
-	'Kerr Black Hole',	
-	'Alcubierre Warp Drive Bubble',
+var objectTypes = [	
+	'Alcubierre Warp Drive Bubble'
 ];
 var objectType = objectTypes[0];
 var objectDist = 10;
@@ -139,20 +137,18 @@ var skyboxRendererClassName;
 //so in the mean time, this will take a page reset every time the glutil changes
 
 function resize() {
+	var canv_h = 0.8 * window.innerHeight;
 	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
+	canvas.height = canv_h;
 	glutil.resize();
-
-	var info = $('#info');
-	var width = window.innerWidth 
-		- parseInt(info.css('padding-left'))
-		- parseInt(info.css('padding-right'));
-	info.width(width);
-	var height = window.innerHeight
-		- parseInt(info.css('padding-top'))
-		- parseInt(info.css('padding-bottom'));
-	info.height(height - 32);
 }
+
+window.addEventListener('resize', function() {
+	var canv_h = 0.8 * window.innerHeight;
+	canvas.width = window.innerWidth;
+	canvas.height = canv_h;
+	glutil.resize();
+  });
 
 // render loop
 
@@ -288,13 +284,7 @@ function main1() {
 		}
 	});
 	
-	canvas = $('<canvas>', {
-		css : {
-			left : 0,
-			top : 0,
-			position : 'absolute'
-		}
-	}).prependTo(document.body).get(0);
+	canvas = $('<canvas>').prependTo(document.querySelector("main")).get(0);
 	$(canvas).disableSelection()
 
 	var objectTypeParamDivs = {};
@@ -363,7 +353,6 @@ function main1() {
 		$('#webglfail').show();
 		throw e;
 	}
-	$('#menu').show();
 	
 	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
 	
